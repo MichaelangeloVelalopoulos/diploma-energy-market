@@ -1,0 +1,10 @@
+{
+  "Evia":        [38.6, 23.9],
+  "Peloponnese": [37.1, 22.3],
+  "Thrace":      [41.0, 26.3],
+  "Crete":       [35.3, 25.1],
+  "Thessaly":    [39.6, 22.4],
+  "CentralGR":   [38.5, 22.5],
+  "SouthAegean": [36.8, 25.0],
+  "W.Macedonia": [40.5, 21.5]
+}
