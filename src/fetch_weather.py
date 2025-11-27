@@ -11,7 +11,8 @@ import pandas as pd
 import requests
 
 ATHENS_TZ = "Europe/Athens"
-OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
+OPEN_METEO_URL = "https://archive-api.open-meteo.com/v1/archive"
+
 
 # Variables: ώρα-ώρα (hourly). Θα τις κάνουμε resample σε 15' αν ζητηθεί.
 HOURLY_VARS = [
