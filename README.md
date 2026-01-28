@@ -67,4 +67,128 @@ jupyter lab notebooks/
 	- Some fetch scripts rely on external APIs; check individual script docstrings for configuration or API keys.
 	- If you run into missing package errors, verify your active virtual environment and re-run `pip install -r requirements.txt`.
 
+## Data Processing Pipeline
+
+### Run All Three Scripts (One-Liner)
+
+**macOS / Linux:**
+
+```bash
+python src/2026/fetch_henex_ida_results.py && python src/2026/admie2026.py && python src/2026/HENEX2026DAMPRICES.PY
+```
+
+**Windows (PowerShell):**
+
+```powershell
+python src/2026/fetch_henex_ida_results.py; python src/2026/admie2026.py; python src/2026/HENEX2026DAMPRICES.PY
+```
+
+### Individual Commands with Details
+
+#### 1. Fetch HEnEx IDA Results
+
+**One-Liner:**
+```bash
+python src/2026/fetch_henex_ida_results.py
+```
+
+**What it does:**
+- Downloads intraday auction (IDA) market results from HEnEx (Greek power exchange)
+- Fetches IDA1, IDA2, and IDA3 auction data
+- Extracts clearing prices and volume information for each auction
+
+**Data sources:**
+- HEnEx public API / website
+
+**Output locations:**
+- Raw data: `data/processed/henex_ida_results/raw/IDA{1,2,3}/`
+- Processed data: `data/processed/henex_ida_results/processed/`
+  - `EL-IDA1_Results_*.csv`
+  - `EL-IDA2_Results_*.csv`
+  - `EL-IDA3_Results_*.csv`
+
+**Key details:**
+- Handles multiple file versions (v01, v02, etc.)
+- Automatically skips already downloaded files
+- Parses hourly clearing prices and traded volumes
+- Date range: Oct 1, 2025 - Jan 27, 2026
+
+---
+
+#### 2. Fetch ADMIE 2026 Data
+
+**One-Liner:**
+```bash
+python src/2026/admie2026.py
+```
+
+**What it does:**
+- Retrieves balancing energy and capacity data from ADMIE (Greek Transmission System Operator)
+- Downloads three product types:
+  - **Balancing Energy Product** (BRP): Energy deployed for system balancing
+  - **Balancing Capacity Product** (BCP): Capacity reserved for system balancing
+  - **IMBABE**: Imbalance data (system deviation from schedule)
+
+**Data sources:**
+- ADMIE XML API / data portal
+- Maintains manifest files for efficient incremental updates
+
+**Output locations:**
+- `data/processed/admie_downloads/balancingenergyproduct/` (JSON files by date)
+- `data/processed/admie_downloads/balancingcapacityproduct/` (JSON files by date)
+- `data/processed/admie_downloads/imbabe/` (JSON files by date)
+- Manifest files for tracking downloaded date ranges
+
+**Key details:**
+- Uses manifest files to avoid re-downloading existing data
+- Parses 15-minute interval data
+- Extracts prices, volumes, and imbalance directions
+- Date range: Oct 1, 2025 - Jan 27, 2026
+
+---
+
+#### 3. Process DAM Prices
+
+**One-Liner:**
+```bash
+python src/2026/HENEX2026DAMPRICES.PY
+```
+
+**What it does:**
+- Extracts Day-Ahead Market (DAM) clearing prices from HEnEx ResultsSummary Excel files
+- Parses Market Clearing Price (MCP) for Greece Mainland
+- Creates hourly time series (00:00 - 23:00 UTC)
+- Combines all daily data into a single master dataset
+
+**Data sources:**
+- HEnEx public documents: `EL-DAM_ResultsSummary_EN_v*.xlsx` files
+- Sheet: "MKT_Coupling"
+- Extracts 15-minute MCP data
+
+**Output locations:**
+- Raw Excel files: `data/processed/DAM2026/raw/`
+- Processed data: `data/processed/DAM2026/DAM/`
+  - `EL-DAM_MASTER_20251001_20260127.csv` (hourly aggregated)
+  - `EL-DAM_MASTER_20251001_20260127.parquet` (Parquet format, if pyarrow installed)
+
+**Key details:**
+- Automatically detects best file version (highest v number)
+- Handles multi-line Excel headers
+- Converts 15-minute MCP to hourly format
+- Tracks data source in `SOURCE_FILE` column
+- Date range: Oct 1, 2025 - Jan 27, 2026
+
+---
+
+### Data Integration
+
+After running all three scripts, you can merge the outputs:
+
+```bash
+python src/2026/MergeIDA1_DAM2026.py
+```
+
+This creates merged datasets combining IDA1 + DAM prices:
+- `data/processed/MERGED/EL-IDA1_WITH_DAM_20251001_20260127.csv`
+
 If you'd like, I can also add a short `CONTRIBUTING.md` or a small shell helper script to automate the environment setup.
