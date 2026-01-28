@@ -6,9 +6,18 @@ This project collects and analyzes data from:
 
 Goal: build a forecasting model for intraday electricity prices based on weather and system conditions.
 
-## Installation
+## Installation/Environment Setup
 
-- **Prerequisites:** Python 3.10 or newer and `git`.
+**Prerequisites:** Python 3.10 or newer and `git`.
+
+### Quick Setup (One-Liner)
+
+```bash
+git clone https://github.com/MichaelangeloVelalopoulos/diploma-energy-market.git && cd diploma-energy-market && python3 -m venv .venv && source .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
+```
+
+### Step-by-Step Setup
+
 - **Clone the repo:**
 
 ```bash

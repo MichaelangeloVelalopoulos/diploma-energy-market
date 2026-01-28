@@ -1,0 +1,160 @@
+import re
+import sys
+import warnings
+from pathlib import Path
+
+import pandas as pd
+
+warnings.filterwarnings("ignore", message="Workbook contains no default style")
+
+# =========================
+# CONFIG
+# =========================
+RAW_DIR = Path("/Users/michaelangelovelalopoulos/Desktop/diploma-energy-market/data/processed/DAM2026/raw")
+OUT_CSV = Path("/Users/michaelangelovelalopoulos/Desktop/diploma-energy-market/data/processed/DAM2026/EL-DAM_MASTER_20251001_20260127.csv")
+
+DATE_FROM = "20251001"
+DATE_TO   = "20260127"
+
+# 20251001_EL-DAM_ResultsSummary_EN_v01.xlsx
+PAT = re.compile(r"^(?P<d>\d{8})_EL-DAM_ResultsSummary_EN_v(?P<v>\d{2})\.xlsx$", re.IGNORECASE)
+
+# =========================
+# HELPERS
+# =========================
+def within_range(d: str) -> bool:
+    return int(DATE_FROM) <= int(d) <= int(DATE_TO)
+
+def pick_best_file_per_day(paths: list[Path]) -> dict[str, Path]:
+    """
+    If multiple versions exist for same day, keep highest v##.
+    If tie, keep newest mtime.
+    """
+    best: dict[str, tuple[int, float, Path]] = {}
+    for p in paths:
+        m = PAT.match(p.name)
+        if not m:
+            continue
+        d = m.group("d")
+        if not within_range(d):
+            continue
+
+        v = int(m.group("v"))
+        mtime = p.stat().st_mtime
+
+        if d not in best:
+            best[d] = (v, mtime, p)
+        else:
+            v0, t0, _ = best[d]
+            if (v > v0) or (v == v0 and mtime > t0):
+                best[d] = (v, mtime, p)
+
+    return {d: tup[2] for d, tup in best.items()}
+
+def norm(x) -> str:
+    return re.sub(r"\s+", " ", str(x).strip()).lower()
+
+def find_mkt_sheet_and_row(xl: pd.ExcelFile) -> tuple[str, int]:
+    """
+    Prefer sheet named 'MKT_Coupling'.
+    Else search any sheet for a cell containing '15min mcp'.
+    Returns (sheet_name, row_index_in_headerless_df0).
+    """
+    # 1) Prefer known sheet
+    if "MKT_Coupling" in xl.sheet_names:
+        df0 = pd.read_excel(xl, sheet_name="MKT_Coupling", header=None, engine="openpyxl")
+        col0 = df0.iloc[:, 0].astype(str).map(norm)
+        hits = col0[col0.str.contains("15min mcp", na=False)]
+        if len(hits) > 0:
+            return "MKT_Coupling", int(hits.index[0])
+
+    # 2) Fallback: search all sheets
+    for sh in xl.sheet_names:
+        df0 = pd.read_excel(xl, sheet_name=sh, header=None, engine="openpyxl")
+        # scan first column (fast and enough for this file type)
+        col0 = df0.iloc[:, 0].astype(str).map(norm)
+        hits = col0[col0.str.contains("15min mcp", na=False)]
+        if len(hits) > 0:
+            return sh, int(hits.index[0])
+
+    raise ValueError("Cannot find row containing '(15min MCP)' in any sheet.")
+
+def parse_day_15min_mcp(path: Path) -> pd.DataFrame:
+    """
+    Extracts Greece Mainland (15min MCP) row -> 96 values -> timestamps from 00:00 step 15min.
+    Output: DELIVERY_MTU, DAM_MCP
+    """
+    m = PAT.match(path.name)
+    if not m:
+        raise ValueError(f"Bad filename: {path.name}")
+    d = m.group("d")
+    dday = pd.to_datetime(d, format="%Y%m%d", errors="raise")
+
+    xl = pd.ExcelFile(path)
+    sheet, mcp_row = find_mkt_sheet_and_row(xl)
+
+    df0 = pd.read_excel(xl, sheet_name=sheet, header=None, engine="openpyxl")
+
+    # MCP values are typically in columns 1..96 (sometimes more columns exist, we just take numeric)
+    raw_vals = df0.iloc[mcp_row, 1:].tolist()
+
+    vals = pd.to_numeric(pd.Series(raw_vals), errors="coerce")
+
+    # Keep first 96 non-null-ish in order (some files may have trailing junk columns)
+    vals = vals.dropna().reset_index(drop=True)
+    if len(vals) < 96:
+        raise ValueError(f"15min MCP row found, but only {len(vals)} numeric values (expected 96).")
+
+    vals = vals.iloc[:96].to_numpy(dtype=float)
+
+    times = [dday + pd.Timedelta(minutes=15*i) for i in range(96)]
+    out = pd.DataFrame({"DELIVERY_MTU": times, "DAM_MCP": vals})
+    return out
+
+# =========================
+# MAIN
+# =========================
+def main():
+    if not RAW_DIR.exists():
+        raise FileNotFoundError(f"RAW_DIR not found: {RAW_DIR}")
+
+    files = sorted(RAW_DIR.glob("*.xlsx"))
+    chosen = pick_best_file_per_day(files)
+
+    if not chosen:
+        print(f"No DAM files found in range {DATE_FROM}-{DATE_TO} under {RAW_DIR}")
+        return
+
+    days = sorted(chosen.keys())
+    print(f"Days selected: {len(days)} (min={days[0]} max={days[-1]})")
+
+    frames = []
+    for d in days:
+        p = chosen[d]
+        try:
+            day_df = parse_day_15min_mcp(p)
+            frames.append(day_df)
+            print(f"[OK] {d} <- {p.name} | rows={len(day_df)}")
+        except Exception as e:
+            print(f"[FAIL] {d} <- {p.name} | {e}", file=sys.stderr)
+
+    if not frames:
+        print("Nothing parsed successfully.")
+        return
+
+    full = (
+        pd.concat(frames, ignore_index=True)
+          .sort_values("DELIVERY_MTU")
+          .drop_duplicates(subset=["DELIVERY_MTU"], keep="last")
+          .reset_index(drop=True)
+    )
+
+    OUT_CSV.parent.mkdir(parents=True, exist_ok=True)
+    full.to_csv(OUT_CSV, index=False)
+
+    print(f"\nWrote: {OUT_CSV}")
+    print(f"Rows: {len(full)}")
+    print(f"Range: {full['DELIVERY_MTU'].min()} -> {full['DELIVERY_MTU'].max()}")
+
+if __name__ == "__main__":
+    main()
