@@ -12,8 +12,16 @@ Goal: build a forecasting model for intraday electricity prices based on weather
 
 ### Quick Setup (One-Liner)
 
+**macOS / Linux:**
+
 ```bash
 git clone https://github.com/MichaelangeloVelalopoulos/diploma-energy-market.git && cd diploma-energy-market && python3 -m venv .venv && source .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
+```
+
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/MichaelangeloVelalopoulos/diploma-energy-market.git; cd diploma-energy-market; python3 -m venv .venv; .venv\Scripts\Activate.ps1; pip install --upgrade pip; pip install -r requirements.txt
 ```
 
 ### Step-by-Step Setup
