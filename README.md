@@ -223,16 +223,3 @@ python src/2026/HENEX2026DAMPRICES.PY
 - Date range: Oct 1, 2025 - Jan 27, 2026
 
 ---
-
-### Data Integration
-
-After running all three scripts, you can merge the outputs:
-
-```bash
-python src/2026/MergeIDA1_DAM2026.py
-```
-
-This creates merged datasets combining IDA1 + DAM prices:
-- `data/processed/MERGED/EL-IDA1_WITH_DAM_20251001_20260127.csv`
-
-If you'd like, I can also add a short `CONTRIBUTING.md` or a small shell helper script to automate the environment setup.
