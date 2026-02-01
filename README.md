@@ -69,19 +69,63 @@ jupyter lab notebooks/
 
 ## Data Processing Pipeline
 
-### Run All Three Scripts (One-Liner)
+### Step 1: Run Main Pipeline (One-Liner)
 
 **macOS / Linux:**
 
 ```bash
-python src/2026/fetch_henex_ida_results.py && python src/2026/admie2026.py && python src/2026/HENEX2026DAMPRICES.PY
+python src/2026/fetch_henex_ida_results.py && python src/2026/admie2026.py && python src/2026/HENEX2026DAMPRICES.PY && python src/2026/build2026ida1.py && python src/2026/dam2026group.py && python src/2026/MergeIDA1_DAM2026.py && python src/2026/Build2026FINAL.PY
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-python src/2026/fetch_henex_ida_results.py; python src/2026/admie2026.py; python src/2026/HENEX2026DAMPRICES.PY
+python src/2026/fetch_henex_ida_results.py; python src/2026/admie2026.py; python src/2026/HENEX2026DAMPRICES.PY; python src/2026/build2026ida1.py; python src/2026/dam2026group.py; python src/2026/MergeIDA1_DAM2026.py; python src/2026/Build2026FINAL.PY
 ```
+
+**Pipeline Overview:**
+1. `fetch_henex_ida_results.py` - Download IDA1/IDA2/IDA3 auction data → `data/processed/henex_ida_results/`
+2. `admie2026.py` - Download ADMIE balancing & imbalance data → `data/processed/admie_downloads/`
+3. `HENEX2026DAMPRICES.PY` - Extract DAM clearing prices → `data/processed/DAM2026/DAM/`
+4. `build2026ida1.py` - Build IDA1 master dataset with features → `data/processed/henex_ida_results/processed/`
+5. `dam2026group.py` - Aggregate DAM data by bidding zone → `data/processed/DAM2026/`
+6. `MergeIDA1_DAM2026.py` - Merge IDA1 + DAM prices → `data/processed/MERGED/`
+7. `Build2026FINAL.PY` - Integrate all data (IDA, DAM, ADMIE, weather) → `data/processed/MERGED/Final2026.csv`
+
+### Step 2: Fetch ENTSOE Forecasts (Requires API Token)
+
+**Important:** Before running this step, you must:
+
+1. **Get API Token from ENTSOE:**
+   - Go to https://transparency.entsoe.eu/
+   - Register for a free account
+   - Navigate to: Settings → API tokens → Generate New Token
+   - Copy the token
+
+2. **Export Token in Terminal:**
+
+**macOS / Linux:**
+```bash
+export ENTSOE_API_TOKEN="your_api_token_here"
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:ENTSOE_API_TOKEN = "your_api_token_here"
+```
+
+3. **Run ENTSOE Forecasts:**
+```bash
+python src/2026/entsoe_2026forecasts.py
+```
+
+**What it does:**
+- Fetches ENTSOE wind and solar generation forecasts
+- Merges forecasts with previous IDA/DAM/ADMIE data
+- Generates final dataset: `data/processed/MERGED/Final2026.csv`
+
+**Output:**
+- Final merged dataset: `data/processed/MERGED/Final2026.csv` (ready for model training)
 
 ### Individual Commands with Details
 

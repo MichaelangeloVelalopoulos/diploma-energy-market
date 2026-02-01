@@ -1,10 +1,10 @@
 import pandas as pd
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 IDA1_NAME = "EL-IDA1_MASTER_20251001_20260127.csv"
-DAM_NAME  = "EL-DAM_MASTER_20251001_20260127.csv"
+DAM_NAME  = "EL-DAM_20251001_20260127.csv"
 
 OUT_CSV = PROJECT_ROOT / "data" / "processed" / "MERGED" / "EL-IDA1_WITH_DAM_20251001_20260127.csv"
 

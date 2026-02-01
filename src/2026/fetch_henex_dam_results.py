@@ -7,7 +7,6 @@ from datetime import datetime, timedelta
 import requests
 import pandas as pd
 
-
 warnings.filterwarnings("ignore", message="Workbook contains no default style")
 
 # =========================
@@ -15,8 +14,8 @@ warnings.filterwarnings("ignore", message="Workbook contains no default style")
 # =========================
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-RAW_DIR = PROJECT_ROOT / "data" / "processed" / "DAM" / "raw"
 OUT_DIR = PROJECT_ROOT / "data" / "processed" / "DAM"
+RAW_DIR = OUT_DIR / "raw"
 RAW_DIR.mkdir(parents=True, exist_ok=True)
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -76,13 +75,9 @@ def find_best_version_url(yyyymmdd: str):
         if url_exists_xlsx(url):
             best_url = url
             best_fname = url.split("/")[-1]
-            print(f"[DEBUG] Found version {v} for {yyyymmdd}: {best_fname}")
         else:
             if best_url is not None:
-                print(f"[DEBUG] Version {v} not found for {yyyymmdd}, stopping search")
                 break
-    if best_url is None:
-        print(f"[DEBUG] No versions found for {yyyymmdd}")
     return best_url, best_fname
 
 def write_outputs(df: pd.DataFrame, out_base: Path):
@@ -102,14 +97,10 @@ def write_outputs(df: pd.DataFrame, out_base: Path):
 # =========================
 def load_dam_results_summary(path: Path) -> pd.DataFrame:
     """
-    Load MCP from EL-DAM ResultsSummary Excel files.
-    
-    Structure:
-    - Sheet: "MKT_Coupling"
-    - Row 2 (idx=2): hour numbers (1-24, starting from col 1)
-    - Row 7 (idx=7): "Greece Mainland  (15min MCP)" with MCP values
-    
-    Returns: DataFrame with DDAY, DELIVERY_MTU, DAM_MCP
+    Robust loader:
+    - reads first sheet by default
+    - tries to locate the MCP column and an hour/time column
+    - returns standardized columns: DDAY, DELIVERY_MTU, DAM_MCP
     """
     xls = pd.ExcelFile(path, engine="openpyxl")
     # Prefer a sheet that contains "Summary" if present
@@ -122,7 +113,7 @@ def load_dam_results_summary(path: Path) -> pd.DataFrame:
     df = pd.read_excel(path, sheet_name=sheet, engine="openpyxl")
     df.columns = [str(c).strip() for c in df.columns]
 
-     # Find MCP column (case-insensitive contains "MCP")
+    # Find MCP column (case-insensitive contains "MCP")
     mcp_candidates = [c for c in df.columns if "mcp" in c.lower()]
     if not mcp_candidates:
         raise ValueError(f"No MCP-like column found in DAM summary. Columns: {df.columns.tolist()[:30]}")
@@ -171,7 +162,6 @@ def load_dam_results_summary(path: Path) -> pd.DataFrame:
     out["DAM_MCP"] = pd.to_numeric(df[mcp_col], errors="coerce")
     return out[["DDAY", "DELIVERY_MTU", "DAM_MCP"]]
 
-
 # =========================
 # PIPELINE
 # =========================
@@ -179,41 +169,28 @@ def main():
     frames = []
     found_days = 0
     missing_days = 0
-    
-    print(f"\n[DEBUG] Starting DAM pipeline...")
-    print(f"[DEBUG] Date range: {DATE_FROM} to {DATE_TO}")
 
     for yyyymmdd in daterange_yyyymmdd(DATE_FROM, DATE_TO):
         url, fname = find_best_version_url(yyyymmdd)
         if not url:
-            print(f"[DEBUG] Skipping {yyyymmdd} - no URL found")
             missing_days += 1
             continue
 
         found_days += 1
         raw_path = RAW_DIR / fname
-        
-        print(f"[DEBUG] Processing {yyyymmdd}: {fname}")
 
         if not raw_path.exists() or raw_path.read_bytes()[:2] != b"PK":
             print(f"[DAM] Download {fname}")
-            try:
-                download_url(url, raw_path)
-                print(f"[DEBUG] Downloaded successfully: {raw_path}")
-            except Exception as e:
-                print(f"[ERROR] Failed to download {fname}: {e}", file=sys.stderr)
-                continue
+            download_url(url, raw_path)
 
         try:
             day_df = load_dam_results_summary(raw_path)
-            print(f"[DEBUG] Parsed {len(day_df)} rows from {fname}")
             day_df["SOURCE_FILE"] = raw_path.name
             frames.append(day_df)
         except Exception as e:
             print(f"[DAM] ERROR parsing {raw_path.name}: {e}", file=sys.stderr)
 
-    print(f"\n[DEBUG] Summary: Found {found_days} days | Missing {missing_days} days")
-    print(f"[DEBUG] Successfully parsed {len(frames)} files")
+    print(f"[DAM] Days found: {found_days} | missing: {missing_days}")
 
     if not frames:
         print("[DAM] Nothing parsed successfully.")
@@ -224,12 +201,8 @@ def main():
           .sort_values(["DDAY", "DELIVERY_MTU"])
           .reset_index(drop=True)
     )
-    
-    print(f"[DEBUG] Final dataset: {len(full)} rows")
-    print(f"[DEBUG] Date range in data: {full['DDAY'].min()} to {full['DDAY'].max()}")
 
     out_base = OUT_DIR / f"EL-DAM_MASTER_{DATE_FROM}_{DATE_TO}"
-    print(f"[DEBUG] Writing outputs to: {OUT_DIR}")
     write_outputs(full, out_base)
 
 if __name__ == "__main__":

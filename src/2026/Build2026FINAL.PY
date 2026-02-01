@@ -7,12 +7,11 @@ import pandas as pd
 # =========================
 # CONFIG
 # =========================
-MERGED_IN = Path("/Users/michaelangelovelalopoulos/Desktop/diploma-energy-market/data/processed/MERGED/EL-IDA1_WITH_DAM_20251001_20260127.csv")
+MERGED_IN = Path("data/processed/MERGED/EL-IDA1_WITH_DAM_20251001_20260127.csv")
 
-IMBABE_DIR = Path("/Users/michaelangelovelalopoulos/Desktop/diploma-energy-market/data/processed/admie_downloads/imbabe")
+IMBABE_DIR = Path("data/processed/admie_downloads/imbabe")
 
-OUT_CSV = Path("/Users/michaelangelovelalopoulos/Desktop/diploma-energy-market/data/processed/MERGED/EL-IDA1_WITH_DAM_BM_20251001_20260127.csv")
-
+OUT_CSV = Path("data/processed/MERGED/EL-IDA1_WITH_DAM_BM_20251001_20260127.csv")
 DATE_FROM = "2025-10-01 00:00:00"
 DATE_TO   = "2026-01-27 23:45:00"
 

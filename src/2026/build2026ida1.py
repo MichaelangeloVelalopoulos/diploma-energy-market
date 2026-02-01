@@ -7,7 +7,7 @@ import pandas as pd
 # =========================
 # CONFIG (αλλαξέ το path αν χρειάζεται)
 # =========================
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # Βάλε εδώ τον φάκελο που έχεις τα xlsx του IDA1
 # π.χ. PROJECT_ROOT / "data" / "processed" / "IDA1"

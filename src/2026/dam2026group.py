@@ -10,8 +10,10 @@ warnings.filterwarnings("ignore", message="Workbook contains no default style")
 # =========================
 # CONFIG
 # =========================
-RAW_DIR = Path("/Users/michaelangelovelalopoulos/Desktop/diploma-energy-market/data/processed/DAM2026/raw")
-OUT_CSV = Path("/Users/michaelangelovelalopoulos/Desktop/diploma-energy-market/data/processed/DAM2026/EL-DAM_MASTER_20251001_20260127.csv")
+BASE_DIR = Path(__file__).resolve().parents[2]  # diploma-energy-market
+RAW_DIR = BASE_DIR / "data" / "processed" / "DAM2026" / "raw"
+OUT_CSV = BASE_DIR / "data" / "processed" / "DAM2026" / "EL-DAM_20251001_20260127.csv"
+
 
 DATE_FROM = "20251001"
 DATE_TO   = "20260127"
