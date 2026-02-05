@@ -1,10 +1,10 @@
 # Diploma - Forecasting Intraday Electricity Prices in Greece
 
 This project collects and analyzes data from:
-- **Open-Meteo API** (weather features)
+- **ENTSOE** (forecasted features)
 - **IPTO / HEnEx** (system & market data)
 
-Goal: build a forecasting model for intraday electricity prices based on weather and system conditions.
+Goal: build a forecasting model for intraday electricity prices based on weather and system forecasted conditions.
 
 ## Installation/Environment Setup
 
@@ -38,6 +38,13 @@ cd diploma-energy-market
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
+```
+
+- **Create and activate a virtual environment (Windows / PowerShell):**
+
+```powershell
+python3 -m venv .venv
+.venv\Scripts\Activate.ps1
 ```
 
 - **Install Python dependencies:**
