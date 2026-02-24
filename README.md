@@ -87,7 +87,7 @@ python src/2026/fetch_henex_ida_results.py && python src/2026/admie2026.py && py
 **Windows (PowerShell):**
 
 ```powershell
-python src/2026/fetch_henex_ida_results.py; python src/2026/admie2026.py; python src/2026/HENEX2026DAMPRICES.PY; python src/2026/build2026ida1.py; python src/2026/dam2026group.py; python src/2026/MergeIDA1_DAM2026.py; python src/2026/Build2026FINAL.PY
+python src/2026/fetch_henex_ida_results.py; python src/2026/admie2026.py; python src/2026/HENEX2026DAMPRICES.PY; python src/2026/build2026ida1.py; python src/2026/dam2026group.py; python src/2026/MergeIDA1_DAM2026.py; python src/2026/Build2026FINAL.PY; python src/2026/IDA2IDA3merge.py
 ```
 
 **Pipeline Overview:**
@@ -98,7 +98,7 @@ python src/2026/fetch_henex_ida_results.py; python src/2026/admie2026.py; python
 5. `dam2026group.py` - Aggregate DAM data by bidding zone → `data/processed/DAM2026/`
 6. `MergeIDA1_DAM2026.py` - Merge IDA1 + DAM prices → `data/processed/MERGED/`
 7. `Build2026FINAL.PY` - Integrate all data (IDA, DAM, ADMIE, weather) → `data/processed/MERGED/Final2026.csv`
-
+8. `IDA2IDA3merge.py` - Merge IDA2 and IDA3 datasets for additional features → `data/processed/MERGED/Final2026_with_IDA2_IDA3.csv`
 ### Step 2: Fetch ENTSOE Forecasts (Requires API Token)
 
 **Important:** Before running this step, you must:
