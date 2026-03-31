@@ -78,27 +78,38 @@ jupyter lab notebooks/
 
 ### Step 1: Run Main Pipeline (One-Liner)
 
+Before running the pipeline, place the HEnEx archive somewhere accessible, for example:
+
+- `/Users/<your-user>/Downloads/2025_EL-DAM-IDAs_Results.zip`
+
+The pipeline now uses two HEnEx sources:
+
+- The ZIP file for `2025-10-01` through `2025-12-31`
+- The HEnEx website/API for `2026-01-01` through `2026-03-30`
+
 **macOS / Linux:**
 
 ```bash
-python src/2026/fetch_henex_ida_results.py && python src/2026/admie2026.py && python src/2026/HENEX2026DAMPRICES.PY && python src/2026/build2026ida1.py && python src/2026/dam2026group.py && python src/2026/MergeIDA1_DAM2026.py && python src/2026/Build2026FINAL.PY
+python src/2026/extract_henex_zip_results.py --zip-path "/Users/<your-user>/Downloads/2025_EL-DAM-IDAs_Results.zip" && python src/2026/fetch_henex_ida_prices.py && python src/2026/fetch_henex_dam_results.py && python src/2026/admie2026.py && python src/2026/build2026ida1.py && python src/2026/dam2026group.py && python src/2026/MergeIDA1_DAM2026.py && python src/2026/Build2026FINAL.PY && python src/2026/IDA2IDA3merge.py
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
-python src/2026/fetch_henex_ida_results.py; python src/2026/admie2026.py; python src/2026/HENEX2026DAMPRICES.PY; python src/2026/build2026ida1.py; python src/2026/dam2026group.py; python src/2026/MergeIDA1_DAM2026.py; python src/2026/Build2026FINAL.PY; python src/2026/IDA2IDA3merge.py
+python src/2026/extract_henex_zip_results.py --zip-path "C:\Users\<your-user>\Downloads\2025_EL-DAM-IDAs_Results.zip"; python src/2026/fetch_henex_ida_prices.py; python src/2026/fetch_henex_dam_results.py; python src/2026/admie2026.py; python src/2026/build2026ida1.py; python src/2026/dam2026group.py; python src/2026/MergeIDA1_DAM2026.py; python src/2026/Build2026FINAL.PY; python src/2026/IDA2IDA3merge.py
 ```
 
 **Pipeline Overview:**
-1. `fetch_henex_ida_results.py` - Download IDA1/IDA2/IDA3 auction data → `data/processed/henex_ida_results/`
-2. `admie2026.py` - Download ADMIE balancing & imbalance data → `data/processed/admie_downloads/`
-3. `HENEX2026DAMPRICES.PY` - Extract DAM clearing prices → `data/processed/DAM2026/DAM/`
-4. `build2026ida1.py` - Build IDA1 master dataset with features → `data/processed/henex_ida_results/processed/`
-5. `dam2026group.py` - Aggregate DAM data by bidding zone → `data/processed/DAM2026/`
-6. `MergeIDA1_DAM2026.py` - Merge IDA1 + DAM prices → `data/processed/MERGED/`
-7. `Build2026FINAL.PY` - Integrate all data (IDA, DAM, ADMIE, weather) → `data/processed/MERGED/Final2026.csv`
-8. `IDA2IDA3merge.py` - Merge IDA2 and IDA3 datasets for additional features → `data/processed/MERGED/Final2026_with_IDA2_IDA3.csv`
+1. `extract_henex_zip_results.py` - Extract DAM, IDA1, IDA2, and IDA3 Excel files from the HEnEx ZIP for `2025-10-01` to `2025-12-31` → `data/processed/HENEX/raw/`
+2. `fetch_henex_ida_prices.py` - Download IDA1, IDA2, and IDA3 Excel files from HEnEx for `2026-01-01` to `2026-03-30` → `data/processed/HENEX/raw/IDA{1,2,3}/`
+3. `fetch_henex_dam_results.py` - Download DAM Excel files from HEnEx for `2026-01-01` to `2026-03-30` → `data/processed/HENEX/raw/DAM/`
+4. `admie2026.py` - Download ADMIE balancing and imbalance data → `data/processed/admie_downloads/`
+5. `build2026ida1.py` - Build the IDA1 master dataset from the unified HEnEx raw folder → `data/processed/HENEX/processed/2026idaonlydataset/`
+6. `dam2026group.py` - Build the DAM 15-minute MCP series from the unified HEnEx raw folder → `data/processed/DAM2026/`
+7. `MergeIDA1_DAM2026.py` - Merge IDA1 and DAM data → `data/processed/MERGED/EL-IDA1_WITH_DAM_20251001_20260330.csv`
+8. `Build2026FINAL.PY` - Merge in ADMIE balancing market data → `data/processed/MERGED/EL-IDA1_WITH_DAM_BM_20251001_20260330.csv`
+9. `IDA2IDA3merge.py` - Add IDA2 and IDA3 MCP features → `data/processed/MERGED/Final2026_with_IDA2_IDA3MORETIME.csv`
+
 ### Step 2: Fetch ENTSOE Forecasts (Requires API Token)
 
 **Important:** Before running this step, you must:
@@ -123,50 +134,100 @@ $env:ENTSOE_API_TOKEN = "your_api_token_here"
 
 3. **Run ENTSOE Forecasts:**
 ```bash
-python src/2026/entsoe_2026forecasts.py
+python src/entsoe_2026forecasts.py
 ```
 
 **What it does:**
 - Fetches ENTSOE wind and solar generation forecasts
 - Merges forecasts with previous IDA/DAM/ADMIE data
-- Generates final dataset: `data/processed/MERGED/Final2026.csv`
+- Generates the final enriched dataset for model training
 
 **Output:**
-- Final merged dataset: `data/processed/MERGED/Final2026.csv` (ready for model training)
+- Final merged dataset in `data/processed/MERGED/`
 
 ### Individual Commands with Details
 
-#### 1. Fetch HEnEx IDA Results
+#### 1. Extract Historical HEnEx ZIP Data
 
 **One-Liner:**
 ```bash
-python src/2026/fetch_henex_ida_results.py
+python src/2026/extract_henex_zip_results.py --zip-path "/Users/<your-user>/Downloads/2025_EL-DAM-IDAs_Results.zip"
 ```
 
 **What it does:**
-- Downloads intraday auction (IDA) market results from HEnEx (Greek power exchange)
-- Fetches IDA1, IDA2, and IDA3 auction data
-- Extracts clearing prices and volume information for each auction
+- Extracts HEnEx DAM, IDA1, IDA2, and IDA3 Excel files from the provided archive
+- Keeps only the target historical window from `2025-10-01` through `2025-12-31`
+- Places the extracted raw files into one unified folder structure used by the rest of the pipeline
 
 **Data sources:**
-- HEnEx public API / website
+- HEnEx archive: `2025_EL-DAM-IDAs_Results.zip`
 
 **Output locations:**
-- Raw data: `data/processed/henex_ida_results/raw/IDA{1,2,3}/`
-- Processed data: `data/processed/henex_ida_results/processed/`
-  - `EL-IDA1_Results_*.csv`
-  - `EL-IDA2_Results_*.csv`
-  - `EL-IDA3_Results_*.csv`
+- `data/processed/HENEX/raw/DAM/`
+- `data/processed/HENEX/raw/IDA1/`
+- `data/processed/HENEX/raw/IDA2/`
+- `data/processed/HENEX/raw/IDA3/`
 
 **Key details:**
-- Handles multiple file versions (v01, v02, etc.)
-- Automatically skips already downloaded files
-- Parses hourly clearing prices and traded volumes
-- Date range: Oct 1, 2025 - Jan 27, 2026
+- Selects files only for `2025-10-01` to `2025-12-31`
+- Preserves the original HEnEx filenames
+- Reports any missing dates that are not present in the ZIP
 
 ---
 
-#### 2. Fetch ADMIE 2026 Data
+#### 2. Fetch HEnEx IDA Results For 2026
+
+**One-Liner:**
+```bash
+python src/2026/fetch_henex_ida_prices.py
+```
+
+**What it does:**
+- Downloads IDA1, IDA2, and IDA3 Excel files from HEnEx for the 2026 segment
+- Stores them in the same raw HEnEx folders as the ZIP-extracted files
+- Completes the HEnEx IDA coverage for `2026-01-01` through `2026-03-30`
+
+**Data sources:**
+- HEnEx public documents / website
+
+**Output locations:**
+- `data/processed/HENEX/raw/IDA1/`
+- `data/processed/HENEX/raw/IDA2/`
+- `data/processed/HENEX/raw/IDA3/`
+
+**Key details:**
+- Uses the highest available file version for each day
+- Skips already downloaded files
+- Date range: Jan 1, 2026 - Mar 30, 2026
+
+---
+
+#### 3. Fetch HEnEx DAM Results For 2026
+
+**One-Liner:**
+```bash
+python src/2026/fetch_henex_dam_results.py
+```
+
+**What it does:**
+- Downloads DAM Excel files for the 2026 segment
+- Supports both `EL-DAM_Results_EN_*.xlsx` and `EL-DAM_ResultsSummary_EN_*.xlsx` naming patterns
+- Stores them in the same raw HEnEx DAM folder as the ZIP-extracted historical files
+
+**Data sources:**
+- HEnEx public documents / website
+
+**Output locations:**
+- `data/processed/HENEX/raw/DAM/`
+
+**Key details:**
+- Uses the highest available file version for each day
+- Skips already downloaded files
+- Date range: Jan 1, 2026 - Mar 30, 2026
+
+---
+
+#### 4. Fetch ADMIE 2026 Data
 
 **One-Liner:**
 ```bash
@@ -194,39 +255,56 @@ python src/2026/admie2026.py
 - Uses manifest files to avoid re-downloading existing data
 - Parses 15-minute interval data
 - Extracts prices, volumes, and imbalance directions
-- Date range: Oct 1, 2025 - Jan 27, 2026
+- Date range: Oct 1, 2025 - Mar 30, 2026
 
 ---
 
-#### 3. Process DAM Prices
+#### 5. Build IDA1 Master Dataset
 
 **One-Liner:**
 ```bash
-python src/2026/HENEX2026DAMPRICES.PY
+python src/2026/build2026ida1.py
 ```
 
 **What it does:**
-- Extracts Day-Ahead Market (DAM) clearing prices from HEnEx ResultsSummary Excel files
-- Parses Market Clearing Price (MCP) for Greece Mainland
-- Creates hourly time series (00:00 - 23:00 UTC)
-- Combines all daily data into a single master dataset
+- Reads all raw IDA1 files from the unified HEnEx raw folder
+- Picks the best version per day
+- Reshapes the auction data and builds one master IDA1 dataset with a unified `MCP` column
 
 **Data sources:**
-- HEnEx public documents: `EL-DAM_ResultsSummary_EN_v*.xlsx` files
-- Sheet: "MKT_Coupling"
-- Extracts 15-minute MCP data
+- HEnEx raw Excel files in `data/processed/HENEX/raw/IDA1/`
 
 **Output locations:**
-- Raw Excel files: `data/processed/DAM2026/raw/`
-- Processed data: `data/processed/DAM2026/DAM/`
-  - `EL-DAM_MASTER_20251001_20260127.csv` (hourly aggregated)
-  - `EL-DAM_MASTER_20251001_20260127.parquet` (Parquet format, if pyarrow installed)
+- `data/processed/HENEX/processed/2026idaonlydataset/EL-IDA1_MASTER_20251001_20260330.csv`
 
 **Key details:**
-- Automatically detects best file version (highest v number)
-- Handles multi-line Excel headers
-- Converts 15-minute MCP to hourly format
-- Tracks data source in `SOURCE_FILE` column
-- Date range: Oct 1, 2025 - Jan 27, 2026
+- Automatically merges ZIP and API periods because both land in the same raw folder
+- Drops the detailed `TRADES__*` columns after building the master dataset
+- Date range: Oct 1, 2025 - Mar 30, 2026
+
+---
+
+#### 6. Build DAM MCP Series
+
+**One-Liner:**
+```bash
+python src/2026/dam2026group.py
+```
+
+**What it does:**
+- Reads all raw DAM Excel files from the unified HEnEx raw folder
+- Extracts the Greece Mainland 15-minute MCP series
+- Produces one clean DAM time series keyed by `DELIVERY_MTU`
+
+**Data sources:**
+- HEnEx raw Excel files in `data/processed/HENEX/raw/DAM/`
+
+**Output locations:**
+- `data/processed/DAM2026/EL-DAM_20251001_20260330.csv`
+
+**Key details:**
+- Supports both ZIP-extracted `Results_EN` files and API-downloaded `ResultsSummary_EN` files
+- Keeps the best version per day when duplicates exist
+- Date range: Oct 1, 2025 - Mar 30, 2026
 
 ---

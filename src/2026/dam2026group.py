@@ -11,21 +11,31 @@ warnings.filterwarnings("ignore", message="Workbook contains no default style")
 # CONFIG
 # =========================
 BASE_DIR = Path(__file__).resolve().parents[2]  # diploma-energy-market
-RAW_DIR = BASE_DIR / "data" / "processed" / "DAM2026" / "raw"
-OUT_CSV = BASE_DIR / "data" / "processed" / "DAM2026" / "EL-DAM_20251001_20260127.csv"
+RAW_DIR = BASE_DIR / "data" / "processed" / "HENEX" / "raw" / "DAM"
+OUT_CSV = BASE_DIR / "data" / "processed" / "DAM2026" / "EL-DAM_20251001_20260330.csv"
 
 
 DATE_FROM = "20251001"
-DATE_TO   = "20260127"
+DATE_TO   = "20260330"
 
-# 20251001_EL-DAM_ResultsSummary_EN_v01.xlsx
-PAT = re.compile(r"^(?P<d>\d{8})_EL-DAM_ResultsSummary_EN_v(?P<v>\d{2})\.xlsx$", re.IGNORECASE)
+DAM_PATTERNS = [
+    re.compile(r"^(?P<d>\d{8})_EL-DAM_Results_EN_v(?P<v>\d{2})\.xlsx$", re.IGNORECASE),
+    re.compile(r"^(?P<d>\d{8})_EL-DAM_ResultsSummary_EN_v(?P<v>\d{2})\.xlsx$", re.IGNORECASE),
+]
 
 # =========================
 # HELPERS
 # =========================
 def within_range(d: str) -> bool:
     return int(DATE_FROM) <= int(d) <= int(DATE_TO)
+
+
+def match_dam_filename(path: Path) -> re.Match[str] | None:
+    for pattern in DAM_PATTERNS:
+        match = pattern.match(path.name)
+        if match:
+            return match
+    return None
 
 def pick_best_file_per_day(paths: list[Path]) -> dict[str, Path]:
     """
@@ -34,7 +44,7 @@ def pick_best_file_per_day(paths: list[Path]) -> dict[str, Path]:
     """
     best: dict[str, tuple[int, float, Path]] = {}
     for p in paths:
-        m = PAT.match(p.name)
+        m = match_dam_filename(p)
         if not m:
             continue
         d = m.group("d")
@@ -83,35 +93,40 @@ def find_mkt_sheet_and_row(xl: pd.ExcelFile) -> tuple[str, int]:
 
 def parse_day_15min_mcp(path: Path) -> pd.DataFrame:
     """
-    Extracts Greece Mainland (15min MCP) row -> 96 values -> timestamps from 00:00 step 15min.
-    Output: DELIVERY_MTU, DAM_MCP
+    Supports two DAM workbook layouts:
+    1. Tabular results file with DELIVERY_MTU and MCP columns
+    2. Summary workbook with a '(15min MCP)' row inside MKT_Coupling
     """
-    m = PAT.match(path.name)
+    m = match_dam_filename(path)
     if not m:
         raise ValueError(f"Bad filename: {path.name}")
-    d = m.group("d")
-    dday = pd.to_datetime(d, format="%Y%m%d", errors="raise")
+    dday = pd.to_datetime(m.group("d"), format="%Y%m%d", errors="raise")
+
+    table = pd.read_excel(path, sheet_name=0, engine="openpyxl")
+    table.columns = [str(column).strip() for column in table.columns]
+    lower_cols = {column.lower(): column for column in table.columns}
+
+    if "delivery_mtu" in lower_cols and "mcp" in lower_cols:
+        out = table[[lower_cols["delivery_mtu"], lower_cols["mcp"]]].copy()
+        out.columns = ["DELIVERY_MTU", "DAM_MCP"]
+        out["DELIVERY_MTU"] = pd.to_datetime(out["DELIVERY_MTU"], errors="coerce")
+        out["DAM_MCP"] = pd.to_numeric(out["DAM_MCP"], errors="coerce")
+        out = out.dropna(subset=["DELIVERY_MTU", "DAM_MCP"]).copy()
+        out = out[out["DELIVERY_MTU"].dt.normalize() == dday].copy()
+        if not out.empty:
+            return out.reset_index(drop=True)
 
     xl = pd.ExcelFile(path)
     sheet, mcp_row = find_mkt_sheet_and_row(xl)
-
     df0 = pd.read_excel(xl, sheet_name=sheet, header=None, engine="openpyxl")
 
-    # MCP values are typically in columns 1..96 (sometimes more columns exist, we just take numeric)
     raw_vals = df0.iloc[mcp_row, 1:].tolist()
-
-    vals = pd.to_numeric(pd.Series(raw_vals), errors="coerce")
-
-    # Keep first 96 non-null-ish in order (some files may have trailing junk columns)
-    vals = vals.dropna().reset_index(drop=True)
+    vals = pd.to_numeric(pd.Series(raw_vals), errors="coerce").dropna().reset_index(drop=True)
     if len(vals) < 96:
         raise ValueError(f"15min MCP row found, but only {len(vals)} numeric values (expected 96).")
 
-    vals = vals.iloc[:96].to_numpy(dtype=float)
-
-    times = [dday + pd.Timedelta(minutes=15*i) for i in range(96)]
-    out = pd.DataFrame({"DELIVERY_MTU": times, "DAM_MCP": vals})
-    return out
+    times = [dday + pd.Timedelta(minutes=15 * i) for i in range(96)]
+    return pd.DataFrame({"DELIVERY_MTU": times, "DAM_MCP": vals.iloc[:96].to_numpy(dtype=float)})
 
 # =========================
 # MAIN

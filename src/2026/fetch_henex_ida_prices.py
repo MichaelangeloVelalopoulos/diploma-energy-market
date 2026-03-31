@@ -11,18 +11,19 @@ from urllib3.util.retry import Retry
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-RAW_DIR = PROJECT_ROOT / "data" / "processed" / "HENEX" / "raw" / "DAM"
+RAW_ROOT = PROJECT_ROOT / "data" / "processed" / "HENEX" / "raw"
 
 DATE_FROM = "20260101"
 DATE_TO = "20260330"
 
-DOC_BASE = "https://www.enexgroup.gr/documents/20126/366820"
-FILENAME_TEMPLATES = [
-    "{date}_EL-DAM_Results_EN_v{version:02d}.xlsx",
-    "{date}_EL-DAM_ResultsSummary_EN_v{version:02d}.xlsx",
-]
+DOC_BASE = "https://www.enexgroup.gr/documents/20126"
+FOLDERS = {
+    "IDA1": "3257249",
+    "IDA2": "3257281",
+    "IDA3": "3257522",
+}
 
-MAX_VERSION = 20
+MAX_VERSION = 10
 REQUEST_DELAY = 0.8
 
 
@@ -57,6 +58,11 @@ def daterange_yyyymmdd(start_yyyymmdd: str, end_yyyymmdd: str):
         current += timedelta(days=1)
 
 
+def build_url(ida_tag: str, yyyymmdd: str, version: int) -> str:
+    folder = FOLDERS[ida_tag]
+    return f"{DOC_BASE}/{folder}/{yyyymmdd}_EL-{ida_tag}_Results_EN_v{version:02d}.xlsx"
+
+
 def url_exists(url: str, timeout: int = 10) -> bool:
     time.sleep(REQUEST_DELAY)
     try:
@@ -78,62 +84,61 @@ def download_url(url: str, destination: Path, timeout: int = 120) -> None:
     destination.write_bytes(response.content)
 
 
-def find_best_version_url(yyyymmdd: str) -> tuple[str | None, str | None]:
+def find_best_version_url(ida_tag: str, yyyymmdd: str) -> tuple[str | None, str | None]:
     best_url = None
-    best_filename = None
-
+    best_name = None
     for version in range(1, MAX_VERSION + 1):
-        matched_this_round = False
-        for template in FILENAME_TEMPLATES:
-            filename = template.format(date=yyyymmdd, version=version)
-            url = f"{DOC_BASE}/{filename}"
-            if url_exists(url):
-                best_url = url
-                best_filename = filename
-                matched_this_round = True
-                break
-
-        if best_url is not None and not matched_this_round:
+        url = build_url(ida_tag, yyyymmdd, version)
+        if url_exists(url):
+            best_url = url
+            best_name = url.rsplit("/", 1)[-1]
+        elif best_url is not None:
             break
+    return best_url, best_name
 
-    return best_url, best_filename
 
-
-def main() -> None:
-    RAW_DIR.mkdir(parents=True, exist_ok=True)
+def download_market(ida_tag: str) -> None:
+    market_dir = RAW_ROOT / ida_tag
+    market_dir.mkdir(parents=True, exist_ok=True)
 
     found_days = 0
     downloaded_days = 0
     cached_days = 0
     missing_days = 0
 
-    print(f"[DAM] target range: {DATE_FROM} -> {DATE_TO}")
+    print(f"\n[{ida_tag}] target range: {DATE_FROM} -> {DATE_TO}")
 
     for yyyymmdd in daterange_yyyymmdd(DATE_FROM, DATE_TO):
-        url, filename = find_best_version_url(yyyymmdd)
+        url, filename = find_best_version_url(ida_tag, yyyymmdd)
         if not url or not filename:
             missing_days += 1
             continue
 
         found_days += 1
-        destination = RAW_DIR / filename
+        destination = market_dir / filename
 
         if destination.exists() and destination.stat().st_size > 100 and destination.read_bytes()[:2] == b"PK":
             cached_days += 1
             continue
 
         try:
-            print(f"[DAM] download {filename}")
+            print(f"[{ida_tag}] download {filename}")
             download_url(url, destination)
             downloaded_days += 1
         except Exception as exc:
             missing_days += 1
-            print(f"[DAM] failed {filename}: {exc}", file=sys.stderr)
+            print(f"[{ida_tag}] failed {filename}: {exc}", file=sys.stderr)
 
     print(
-        f"[DAM] found={found_days} downloaded={downloaded_days} "
+        f"[{ida_tag}] found={found_days} downloaded={downloaded_days} "
         f"cached={cached_days} missing={missing_days}"
     )
+
+
+def main() -> None:
+    RAW_ROOT.mkdir(parents=True, exist_ok=True)
+    for ida_tag in ["IDA1", "IDA2", "IDA3"]:
+        download_market(ida_tag)
 
 
 if __name__ == "__main__":
